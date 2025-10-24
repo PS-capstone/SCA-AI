@@ -1,5 +1,6 @@
-OPEN_AI_MODEL='gpt-4o-mini'
-GEMINI_MODEL='Gemini 2.5 Flash-Lite'
+import os
+from dotenv import load_dotenv
+
 # 점수 범위
 COGNITIVE_SCORE_MIN = 1
 COGNITIVE_SCORE_MAX = 6
@@ -33,4 +34,8 @@ QUEST_TYPE_WEIGHT = 0.6
 GLOBAL_WEIGHT = 0.4
 
 # LLM 설정
-OPENAI_MODEL = "gpt-4o-mini"
+load_dotenv()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+OPENAI_MODEL='gpt-4o-mini'
+GEMINI_MODEL='Gemini 2.5 Flash-Lite'
