@@ -2,6 +2,10 @@ from config import OPENAI_API_KEY, OPENAI_MODEL
 from openai import OpenAI
 import json
 
+# ----------------------------------------------------------------------
+# 1. 초기 설정
+# ----------------------------------------------------------------------
+
 client = OpenAI(
   api_key=OPENAI_API_KEY, 
 )
@@ -24,6 +28,9 @@ except json.JSONDecodeError:
     MATH_BOOK_DB = {}
     SORTED_BOOK_KEYS = []
 
+# ----------------------------------------------------------------------
+# 2. llm 호출 및 Quest Analyze
+# ----------------------------------------------------------------------
 
 PROMPT_TEMPLATE = """
     당신은 11-17세(중1~고3) 학생을 위한 수학 교육 과제 분석 AI 전문가입니다.
@@ -124,6 +131,10 @@ def questAnalyzer(quest_text: str) -> dict:
         return {"error": f"{e}"}
     
     
+# ----------------------------------------------------------------------
+# 3. 기본 보상 계산
+# ----------------------------------------------------------------------
+
 # 기본 보상 계산
 def baseRewardCalculator(analysis: dict):
     cognitive=analysis['cognitive_process_score']
