@@ -1,4 +1,4 @@
-from config import *
+from config import OPENAI_API_KEY, OPENAI_MODEL
 from openai import OpenAI
 import json
 
@@ -129,18 +129,3 @@ def questAnalyzer(quest_text: str) -> dict:
     except Exception as e:
         print(f"Error: {e}")
         return {"error": f"{e}"}
-    
-    
-# ----------------------------------------------------------------------
-# 3. 기본 보상 계산
-# ----------------------------------------------------------------------
-
-# 기본 보상 계산
-def baseRewardCalculator(analysis: dict):
-    cognitive=analysis['cognitive_process_score']
-    effort=analysis['effort_score']
-
-    exploration_data = (cognitive ** 2) * EXPLORATION_COGNITIVE_WEIGHT + effort * EXPLORATION_EFFORT_WEIGHT
-    coral=effort * CORAL_EFFORT_WEIGHT + cognitive * CORAL_COGNITIVE_WEIGHT
-
-    return exploration_data, coral
