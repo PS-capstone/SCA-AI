@@ -39,19 +39,16 @@ class MockStorage:
 
     def save(self, filepath: str, data: dict) -> None:
         """[Mock] 딕셔너리에 데이터를 저장."""
-        print(f"[MockStorage] SAVE: {filepath} (데이터 크기: {len(data)})")
         _mock_database[filepath] = data 
 
     def append_log(self, filepath: str, log_entry: dict) -> None:
         """[Mock] 딕셔너리의 리스트에 로그를 추가."""
-        print(f"[MockStorage] APPEND LOG: {filepath}")
         current_logs = _mock_database.get(filepath, [])
         current_logs.append(copy.deepcopy(log_entry)) 
         _mock_database[filepath].append(log_entry) 
         
     def load_logs(self, filepath: str) -> list:
         """[Mock] 딕셔너리에서 로그 리스트를 로드."""
-        print(f"[MockStorage] LOAD LOGS: {filepath}")
         return copy.deepcopy(_mock_database.get(filepath, []))
 
     def reset_database(self):
@@ -84,7 +81,6 @@ class MockStudentFactorManager:
         
         self.global_factor = student_data.get('global_factor', 1.0)
         self.quest_factors = student_data.get('quest_factors', {})
-        print(f"[MockManager] {student_id} 로드: global={self.global_factor}")
 
     def _load_data(self) -> dict:
         """
@@ -95,10 +91,6 @@ class MockStudentFactorManager:
         return all_data.get(self.student_id, {})
 
     def update_factor(self, quest_type: str, new_global: float, new_quest: float) -> None:
-        print(f"[MockManager] {self.student_id} 업데이트 시작...")
-    
-        # 업데이트 전 DB 상태 확인
-        print(json.dumps(_mock_database.get(self.db_path, {}), indent=2, ensure_ascii=False))
         
         all_data = storage.load(self.db_path)
         

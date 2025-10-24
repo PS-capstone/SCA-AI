@@ -8,7 +8,7 @@ from config import (
     FACTOR_MIN, FACTOR_MAX, OVERRIDE_THRESHOLD, FINE_TUNE_THRESHOLD
 )
 #form config import STUDENT_FACTOR_DB_PATH, LEARNING_LOG_PATH
-from mock_learning_engine import (
+from mock_file.mock_learning_engine import (
     MockStudentFactorManager as StudentFactorManager, 
     get_weeks_since_semester_start,
     storage,  
