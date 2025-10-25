@@ -1,0 +1,8 @@
+openai==2.3.0
+google-genai==1.44.0
+langchain==0.3.0
+chromadb==1.1.1
+pandas==2.3.3
+matplotlib==3.10.0
+python-dotenv==1.1.1
+pip-tools==7.5.1

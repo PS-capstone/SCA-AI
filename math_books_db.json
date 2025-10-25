@@ -1,0 +1,122 @@
+{
+  "개념원리": {
+    "type": "textbook",
+    "difficulty": 3,
+    "target": "중등/고등"
+  },
+  "풍산자 개념완성": {
+    "type": "textbook",
+    "difficulty": 3,
+    "target": "중등"
+  },
+  "우공비": {
+    "type": "textbook",
+    "difficulty": 2,
+    "target": "중등"
+  },
+  "수학의 정석 (기본)": {
+    "type": "textbook",
+    "difficulty": 4,
+    "target": "고등"
+  },
+  "개념쎈": {
+    "type": "textbook",
+    "difficulty": 3,
+    "target": "중등/고등"
+  },
+  "개념플러스유형": {
+    "type": "problem-solving book",
+    "difficulty": 4,
+    "target": "중등/고등"
+  },
+  "수학의 바이블": {
+    "type": "problem-solving book",
+    "difficulty": 5,
+    "target": "중등/고등"
+  },
+  "쎈": {
+    "type": "problem-solving book",
+    "difficulty": 5,
+    "target": "중등/고등"
+  },
+  "라이트쎈": {
+    "type": "problem-solving book",
+    "difficulty": 3,
+    "target": "중등/고등"
+  },
+  "RPM": {
+    "type": "problem-solving book",
+    "difficulty": 4,
+    "target": "중등/고등"
+  },
+  "풍산자": {
+    "type": "problem-solving book",
+    "difficulty": 4,
+    "target": "중등/고등"
+  },
+  "마플시너지": {
+    "type": "problem-solving book",
+    "difficulty": 7,
+    "target": "고등"
+  },
+  "우공비Q+Q": {
+    "type": "problem-solving book",
+    "difficulty": 4,
+    "target": "중등"
+  },
+  "최상위라이트": {
+    "type": "problem-solving book",
+    "difficulty": 5,
+    "target": "중등"
+  },
+  "자이스토리": {
+    "type": "advanced book",
+    "difficulty": 8,
+    "target": "고등"
+  },
+  "일품": {
+    "type": "problem-solving book",
+    "difficulty": 7,
+    "target": "중등/고등"
+  },
+  "숨마쿰라우데": {
+    "type": "advanced book",
+    "difficulty": 7,
+    "target": "고등"
+  },
+  "고쟁이": {
+    "type": "advanced book",
+    "difficulty": 8,
+    "target": "고등"
+  },
+  "최상위수학": {
+    "type": "advanced book",
+    "difficulty": 9,
+    "target": "중등/고등"
+  },
+  "블랙라벨": {
+    "type": "advanced book",
+    "difficulty": 9,
+    "target": "고등"
+  },
+  "일등급수학": {
+    "type": "advanced book",
+    "difficulty": 9,
+    "target": "고등"
+  },
+  "특작": {
+    "type": "advanced book",
+    "difficulty": 9,
+    "target": "고등"
+  },
+  "수학의 정석 (실력편)": {
+    "type": "advanced book",
+    "difficulty": 8,
+    "target": "고등"
+  },
+  "A급": {
+    "type": "advanced book",
+    "difficulty": 9,
+    "target": "중등"
+  }
+}
