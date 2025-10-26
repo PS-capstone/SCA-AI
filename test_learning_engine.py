@@ -86,8 +86,14 @@ def create_feedback_events():
             "student_id": "student_A",
             "quest_id": "Q_001",
             "quest_type": "blacklabel",
-            "ai_reward": 84,
-            "teacher_reward": 90,
+            "ai_reward": {
+                "exploration_data": 84,
+                "coral": 42
+            },
+            "teacher_reward": {
+                "exploration_data": 90,
+                "coral": 45
+            },
             "analysis": {
                 "cognitive_process_score": 4,  # PDF 예시 값
                 "effort_score": 8,             # PDF 예시 값
@@ -105,8 +111,14 @@ def create_feedback_events():
             "student_id": "student_B",
             "quest_id": "Q_001",
             "quest_type": "blacklabel",
-            "ai_reward": 110,
-            "teacher_reward": 130,
+            "ai_reward": {
+                "exploration_data": 110,
+                "coral": 55
+            },
+            "teacher_reward": {
+                "exploration_data": 130,
+                "coral": 60
+            },
             "analysis": {
                 "cognitive_process_score": 4,  # PDF 예시 값
                 "effort_score": 8,             # PDF 예시 값
@@ -124,8 +136,14 @@ def create_feedback_events():
             "student_id": "student_C",
             "quest_id": "Q_001",
             "quest_type": "blacklabel",
-            "ai_reward": 89,
-            "teacher_reward": 85,
+            "ai_reward": {
+                "exploration_data": 89,
+                "coral": 45
+            },
+            "teacher_reward": {
+                "exploration_data": 85,
+                "coral": 43
+            },
             "analysis": {
                 "cognitive_process_score": 4,  # PDF 예시 값
                 "effort_score": 8,             # PDF 예시 값
@@ -144,8 +162,14 @@ def create_feedback_events():
             "student_id": "student_B",
             "quest_id": "Q_002",
             "quest_type": "rpm",
-            "ai_reward": 120,
-            "teacher_reward": 150,
+            "ai_reward": {
+                "exploration_data": 120,
+                "coral": 51
+            },
+            "teacher_reward": {
+                "exploration_data": 150,
+                "coral": 60
+            },
             "analysis": {
                 "cognitive_process_score": 3,  # 예시 값 (적용하기 수준)
                 "effort_score": 9,             # 예시 값 (1시간 이상)
@@ -164,8 +188,14 @@ def create_feedback_events():
             "student_id": "student_B",
             "quest_id": "Q_003",
             "quest_type": "blacklabel",
-            "ai_reward": 115,
-            "teacher_reward": 118,
+            "ai_reward": {
+                "exploration_data": 115,
+                "coral": 54
+            },
+            "teacher_reward": {
+                "exploration_data": 118,
+                "coral": 56
+            },
             "analysis": {
                 "cognitive_process_score": 4,  # 예시 값 (분석하기 수준)
                 "effort_score": 8.5,           # 예시 값 (90분 이상)
@@ -228,9 +258,23 @@ def run_simulation():
         print(f"📌 이벤트 #{i}: {event['student_id']} - {event['quest_type']}")
         print(f"{'─'*60}")
         print(f"  Quest ID: {event['quest_id']}")
-        print(f"  AI 추천 보상: {event['ai_reward']}")
-        print(f"  선생님 최종 보상: {event['teacher_reward']}")
-        print(f"  수정률: {abs(event['teacher_reward'] - event['ai_reward']) / event['ai_reward'] * 100:.1f}%")
+        print(f"  AI 추천 보상:")
+        print(f"    - 탐사 데이터: {event['ai_reward']['exploration_data']}")
+        print(f"    - 코랄: {event['ai_reward']['coral']}")
+        print(f"  선생님 최종 보상:")
+        print(f"    - 탐사 데이터: {event['teacher_reward']['exploration_data']}")
+        print(f"    - 코랄: {event['teacher_reward']['coral']}")
+
+        # 가중평균 계산
+        from config import EXPLORATION_REWARD_WEIGHT, CORAL_REWARD_WEIGHT
+        ai_combined = (event['ai_reward']['exploration_data'] * EXPLORATION_REWARD_WEIGHT +
+                       event['ai_reward']['coral'] * CORAL_REWARD_WEIGHT)
+        teacher_combined = (event['teacher_reward']['exploration_data'] * EXPLORATION_REWARD_WEIGHT +
+                            event['teacher_reward']['coral'] * CORAL_REWARD_WEIGHT)
+        print(f"  가중평균 보상 (E:{EXPLORATION_REWARD_WEIGHT}/C:{CORAL_REWARD_WEIGHT}):")
+        print(f"    - AI: {ai_combined:.1f}")
+        print(f"    - 선생님: {teacher_combined:.1f}")
+        print(f"    - 수정률: {abs(teacher_combined - ai_combined) / ai_combined * 100:.1f}%")
 
         # 학습 사이클 실행
         try:

@@ -37,6 +37,10 @@ COLD_START_WEEKS = 3  # 학기 초 보수적 학습 기간
 QUEST_TYPE_WEIGHT = 0.6
 GLOBAL_WEIGHT = 0.4
 
+# 두 보상(탐사 데이터, 코랄) 학습 시 가중평균 비율
+EXPLORATION_REWARD_WEIGHT = 0.7  # 탐사 데이터 가중치
+CORAL_REWARD_WEIGHT = 0.3        # 코랄 가중치
+
 # LLM 설정
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")

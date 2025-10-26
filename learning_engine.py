@@ -17,9 +17,8 @@ class LearningEngine:
         self.chroma_client = get_chroma_client()
         print(f"[LearningEngine] 초기화 완료. DB 경로: {self.student_factor_db_path}")
     
-    def classify_modification(self, ai_reward: int, teacher_reward:int)->str:
+    def classify_modification(self, modification_rate:float)->str:
         """classify modification"""
-        modification_rate=abs((ai_reward - teacher_reward)/ai_reward)
         if modification_rate > OVERRIDE_THRESHOLD:
             return "OVERRIDE"
         elif modification_rate > FINE_TUNE_THRESHOLD:
@@ -28,16 +27,34 @@ class LearningEngine:
             return "MINOR" 
 
 
-    def calculate_new_factors(self, manager: StudentFactorManager, quest_type:str, ai_reward: int, teacher_reward:int)->dict:
+    def calculate_new_factors(self, manager: StudentFactorManager, quest_type:str,
+                              ai_reward: dict, teacher_reward: dict)->dict:
+        """
+        두 보상(exploration_data, coral)의 가중평균으로 actual_ratio를 계산하여 새 계수를 업데이트.
+
+        Args:
+            manager: StudentFactorManager 인스턴스
+            quest_type: 퀘스트 타입 (예: 'blacklabel', 'rpm')
+            ai_reward: {"exploration_data": int, "coral": int}
+            teacher_reward: {"exploration_data": int, "coral": int}
+        """
+
         old_global = manager.global_factor
         old_quest = manager.quest_factors.get(quest_type, manager.global_factor)
 
-        if ai_reward <= 0:
-            actual_ratio = 1.0
-        else:
-            actual_ratio = teacher_reward / ai_reward
+        if ai_reward["exploration_data"]==0.0:
+            ai_reward["exploration_data"]=1.0
+        if ai_reward["coral"]==0.0:
+            ai_reward["coral"]=1.0
+        exploration_ratio=teacher_reward["exploration_data"]/ai_reward["exploration_data"]
+        coral_ratio=teacher_reward["coral"]/ai_reward["coral"]
+        # 두 보상의 가중평균 계산
 
-        modification_type = self.classify_modification(ai_reward, teacher_reward)
+        actual_ratio = exploration_ratio*EXPLORATION_REWARD_WEIGHT+coral_ratio*CORAL_REWARD_WEIGHT
+
+        # modification_rate 계산 (비율의 차이)
+        modification_rate = abs(actual_ratio - 1.0)
+        modification_type = self.classify_modification(modification_rate)
 
         if modification_type == "OVERRIDE":
             learning_rate = LEARNING_RATE_OVERRIDE
@@ -56,37 +73,44 @@ class LearningEngine:
         new_quest = np.clip(new_quest, FACTOR_MIN, FACTOR_MAX)
 
         explanation = (f"Type: {modification_type} (LR: {learning_rate:.2f}), "
-                    f"Ratio: {actual_ratio:.2f}. "
+                    f"Ratio: {actual_ratio:.2f} (E:{EXPLORATION_REWARD_WEIGHT}/C:{CORAL_REWARD_WEIGHT}). "
                     f"Global: {old_global:.3f} -> {new_global:.3f}, "
                     f"Quest: {old_quest:.3f} -> {new_quest:.3f}")
 
         return {
             "new_global": new_global,
             "new_quest": new_quest,
-            "explanation": explanation
+            "explanation": explanation,
+            "actual_ratio": actual_ratio,
+            "modification_rate": modification_rate,
+            "modification_type": modification_type,
+            "learning_rate": learning_rate,
+            "exploration_ratio": exploration_ratio,
+            "coral_ratio": coral_ratio
         }
 
     def run_learning_cycle(self, feedback_event: dict) -> dict:
             """
             피드백 이벤트를 받아 계수 계산, DB 업데이트, 로깅을 수행.
+            두 보상(exploration_data, coral)의 가중평균으로 학습.
             """
             teacher_id=feedback_event["teacher_id"]
             class_id=feedback_event["class_id"]
             student_id = feedback_event["student_id"]
             quest_id = feedback_event["quest_id"]
             quest_type = feedback_event["quest_type"]
+
             ai_reward = feedback_event["ai_reward"]
             teacher_reward = feedback_event["teacher_reward"]
             analysis=feedback_event["analysis"]
-
-            # StudentFactorManager 인스턴스 생성 (한 번만!)
+            
             manager = StudentFactorManager(student_id, db_path=self.student_factor_db_path)
 
             # 계수 업데이트 전 기존 값 저장
             old_global = manager.global_factor
             old_quest = manager.quest_factors.get(quest_type, manager.global_factor)
 
-            # 새로운 계수 계산 (manager 인스턴스를 인자로 전달)
+            # 새로운 계수 계산 (두 보상을 dict로 전달)
             update_results = self.calculate_new_factors(
                 manager=manager,
                 quest_type=quest_type,
@@ -135,22 +159,29 @@ class LearningEngine:
                     },
                     "rewards": {
                         "exploration_data": {
-                            "before": ai_reward,
-                            "after": teacher_reward,
-                            "delta": teacher_reward - ai_reward
+                            "ai": ai_reward["exploration_data"],
+                            "teacher": teacher_reward["exploration_data"],
+                            "delta": teacher_reward["exploration_data"] - ai_reward["exploration_data"]
+                        },
+                        "coral": {
+                            "ai": ai_reward["coral"],
+                            "teacher": teacher_reward["coral"],
+                            "delta": teacher_reward["coral"] - ai_reward["coral"]
                         }
                     }
                 },
                 "base_rewards": feedback_event.get("base_rewards", {}),
                 "rewards": {
-                    "exploration_data": teacher_reward
+                    "exploration_data": teacher_reward["exploration_data"],
+                    "coral": teacher_reward["coral"]
                 },
                 "learning_params": {
-                    "ai_reward": ai_reward,
-                    "teacher_reward": teacher_reward,
-                    "modification_rate": abs((teacher_reward - ai_reward) / ai_reward) if ai_reward != 0 else 0,
-                    "modification_type": self.classify_modification(ai_reward, teacher_reward),
-                    "learning_rate": self._get_learning_rate(ai_reward, teacher_reward)
+                    "actual_ratio": update_results["actual_ratio"],
+                    "exploration_ratio": update_results["exploration_ratio"],
+                    "coral_ratio": update_results["coral_ratio"],
+                    "modification_rate": update_results["modification_rate"],
+                    "modification_type": update_results["modification_type"],
+                    "learning_rate": update_results["learning_rate"]
                 }
             }
 
@@ -159,9 +190,9 @@ class LearningEngine:
 
             return update_results
 
-    def _get_learning_rate(self, ai_reward: int, teacher_reward: int) -> float:
+    def _get_learning_rate(self, modification_rate: float) -> float:
         """수정 유형에 따른 학습률 반환"""
-        modification_type = self.classify_modification(ai_reward, teacher_reward)
+        modification_type = self.classify_modification(modification_rate)
 
         if modification_type == "OVERRIDE":
             learning_rate = LEARNING_RATE_OVERRIDE
