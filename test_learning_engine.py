@@ -16,10 +16,7 @@ from student_factor_manage import StudentFactorManager
 from build_db import get_chroma_client, build_vectordb
 import storage
 import json
-
-# 테스트용 경로 설정
-TEST_STUDENT_FACTOR_PATH = "./test_student_factor"
-TEST_CHROMA_PATH = "./test_chroma_store"
+from config import (TEST_STUDENT_FACTOR_PATH, TEST_CHROMA_PATH)
 
 def cleanup_test_data():
     """테스트 데이터 초기화"""

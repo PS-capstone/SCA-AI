@@ -41,6 +41,12 @@ GLOBAL_WEIGHT = 0.4
 EXPLORATION_REWARD_WEIGHT = 0.7  # 탐사 데이터 가중치
 CORAL_REWARD_WEIGHT = 0.3        # 코랄 가중치
 
+# 데이터 저장 경로
+TEST_QUEST_DB_PATH = "./data/test_quest_factor"
+TEST_LEARNING_LOG_PATH = "./data/test_learning_log"
+TEST_STUDENT_FACTOR_PATH = "./data/test_student_factor"
+TEST_CHROMA_PATH = "./data/test_chroma_store"
+
 # LLM 설정
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")

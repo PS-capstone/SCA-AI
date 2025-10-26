@@ -1,33 +1,76 @@
-from learning_engine import LearningEngine  
-import pandas as pd 
+from learning_engine import LearningEngine
+import pandas as pd
 from datetime import datetime
-import numpy as np 
+import numpy as np
 from quest_analyzer import quest_analyzer
 from student_factor_manage import StudentFactorManager
-import storage 
 import config
 import uuid
+import json
+import os
+
+# experiment.py 전용 간단한 storage 함수들
+def load_json_db(filepath: str) -> dict:
+    """JSON 파일에서 데이터를 로드 (파일이 없으면 빈 dict 반환)"""
+    if os.path.exists(filepath):
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+def save_json_db(filepath: str, data: dict) -> None:
+    """JSON 파일에 데이터를 저장"""
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 def generate_quest_id()->str:
     """uuid 4 기반 Ques Id 생성"""
     short_uuid=str(uuid.uuid4())[:8]
     return f"Quest_{short_uuid}"
 
+def infer_quest_type(quest_text: str) -> str:
+    """퀘스트 텍스트에서 quest_type을 추론"""
+    quest_text_lower = quest_text.lower()
+
+    if "블랙라벨" in quest_text or "blacklabel" in quest_text_lower or "black label" in quest_text_lower:
+        return "blacklabel"
+    elif "교과서" in quest_text or "textbook" in quest_text_lower:
+        return "textbook"
+    elif "rpm" in quest_text_lower:
+        return "rpm"
+    elif "쎈" in quest_text or "sen" in quest_text_lower:
+        return "sen"
+    elif "개념" in quest_text or "concept" in quest_text_lower:
+        return "concept"
+    elif "시험" in quest_text or "test" in quest_text_lower or "모의고사" in quest_text:
+        return "test"
+    else:
+        return "general"
+
 def process_quest_creation(quest_data:dict)->str:
     quest_id = generate_quest_id()
     print(f"[Experiment] 퀘스트 생성 처리: {quest_id}")
     analysis = quest_analyzer(quest_data['quest_text'])
     print(f"[Experiment] 퀘스트 분석 결과: {analysis}")
-    studentFactorManager = StudentFactorManager(student_id="DUMMY_STUDENT", db_path=config.STUDENT_FACTOR_DB_PATH)
-    base_reward = studentFactorManager.calculate_base_reward(
-        cognitive_score=analysis['cognitive_score'],
+
+    # quest_type이 없으면 텍스트에서 추론
+    if 'quest_type' not in analysis:
+        analysis['quest_type'] = infer_quest_type(quest_data['quest_text'])
+        print(f"[Experiment] Quest Type 추론: {analysis['quest_type']}")
+
+    # Calculate base_reward using first student's manager (base reward is same for all)
+    first_student_id = quest_data['target_students'][0]
+    temp_manager = StudentFactorManager(student_id=first_student_id, db_path=config.TEST_STUDENT_FACTOR_PATH)
+    base_reward = temp_manager.calculate_base_reward(
+        cognitive_score=analysis['cognitive_process_score'],
         effort_score=analysis['effort_score']
     )
+
     personalized_reward_list=[]
     for student_id in quest_data['target_students']:
-        studentFactorManager = StudentFactorManager(student_id, db_path=config.STUDENT_FACTOR_DB_PATH)
+        studentFactorManager = StudentFactorManager(student_id=student_id, db_path=config.TEST_STUDENT_FACTOR_PATH)
         personalized_reward = studentFactorManager.calculate_personalized_reward(
-            cognitive_score=analysis['cognitive_score'],    
+            cognitive_score=analysis['cognitive_process_score'],
             effort_score=analysis['effort_score'],
             quest_type=analysis['quest_type']
         )
@@ -41,34 +84,54 @@ def process_quest_creation(quest_data:dict)->str:
         "base_reward": base_reward,
         "personalized_rewards": personalized_reward_list
     }
-    all_quests = storage.load(config.QUEST_DB_PATH)
+    quest_db_file = config.TEST_QUEST_DB_PATH + "/quests.json"
+    all_quests = load_json_db(quest_db_file)
     all_quests[quest_id] = result
-    storage.save(config.QUEST_DB_PATH, all_quests)
+    save_json_db(quest_db_file, all_quests)
     print(f"[Experiment] 퀘스트 {quest_id}가 DB에 저장되었습니다.")
     return result
 
         
 def process_teacher_modification(quest_id: str, student_id: str,
-                                teacher_exploration: int, teacher_coral: int) -> dict:
-    all_quests = storage.load(config.QUEST_DB_PATH)
+                                teacher_exploration: int, teacher_coral: int,
+                                teacher_id: str = "test_teacher",
+                                class_id: str = "test_class") -> dict:
+    quest_db_file = config.TEST_QUEST_DB_PATH + "/quests.json"
+    all_quests = load_json_db(quest_db_file)
     quest_data = all_quests.get(quest_id)
     if not quest_data:
         raise ValueError(f"퀘스트 ID {quest_id}를 찾을 수 없습니다.")
-    ai_reward_value = None
+
+    # 해당 학생의 AI 보상 정보 찾기
+    ai_reward_info = None
     for reward_info in quest_data['personalized_rewards']:
         if reward_info['student_id'] == student_id:
-            ai_reward_value = reward_info['exploration_data']
+            ai_reward_info = reward_info
             break
-    if ai_reward_value is None:
+
+    if ai_reward_info is None:
         raise ValueError(f"{quest_id} 퀘스트에서 학생 ID {student_id}를 찾을 수 없습니다.")
+
+    # learning_engine의 새로운 구조에 맞춘 feedback_event 생성
     feedback_event = {
+        "teacher_id": teacher_id,
+        "class_id": class_id,
         "quest_id": quest_id,
         "student_id": student_id,
         "quest_type": quest_data['analysis']['quest_type'],
-        "ai_reward": ai_reward_value,
-        "teacher_reward": teacher_exploration
+        "ai_reward": {
+            "exploration_data": ai_reward_info['exploration_data'],
+            "coral": ai_reward_info['coral']
+        },
+        "teacher_reward": {
+            "exploration_data": teacher_exploration,
+            "coral": teacher_coral
+        },
+        "analysis": quest_data['analysis'],
+        "base_rewards": quest_data['base_reward']
     }
-    learningEngine = LearningEngine()
+
+    learningEngine = LearningEngine(student_factor_db_path=config.TEST_STUDENT_FACTOR_PATH)
     learning_result = learningEngine.run_learning_cycle(feedback_event)
     print(f"[Experiment] 수정 처리 완료 (학습 적용)")
     return learning_result
@@ -78,7 +141,7 @@ def run_factor_convergence_experiment(student_id: str, quest_sequence: list,
     if len(quest_sequence) != len(teacher_modifications):
         raise ValueError("퀘스트 시퀀스와 교사 수정 리스트의 길이는 같아야 합니다.")
 
-    manager = StudentFactorManager(student_id, db_path=config.STUDENT_FACTOR_DB_PATH)
+    manager = StudentFactorManager(student_id=student_id, db_path=config.TEST_STUDENT_FACTOR_PATH)
     current_global_factor = manager.global_factor
     print(f"\n[Experiment] === Factor 수렴 테스트 시작 (Student: {student_id}) ===")
     print(f"[Experiment] 초기 Global Factor: {current_global_factor:.4f}\n")
@@ -182,10 +245,10 @@ def run_cold_start_experiment(initial_scores: list,
     
     for score in initial_scores:
         print(f"\n--- [Testing Score: {score}] ---")
-        
+
         student_id = f"cold_start_student_{score}"
 
-        manager = StudentFactorManager(student_id)
+        manager = StudentFactorManager(student_id=student_id, db_path=config.TEST_STUDENT_FACTOR_PATH)
         manager.initialize_factor(student_score=score)
         
         df = run_factor_convergence_experiment(

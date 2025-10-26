@@ -132,5 +132,5 @@ data/
 logs/
 *.log
 
-test_chroma_store/
-test_student_factor/
+data/
+chroma_store_test/
