@@ -131,3 +131,6 @@ data/
 !config.json
 logs/
 *.log
+
+test_chroma_store/
+test_student_factor/

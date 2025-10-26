@@ -1,25 +1,31 @@
-from mock_file.mock_experiment import( MockStudentFactorManager as StudentFactorManager,
- storage, STUDENT_FACTOR_DB_PATH, LEARNING_LOG_PATH,
- generate_quest_id, MockQuestAnalyzer as QuestAnalyzer, QUEST_DB_PATH)  
 from learning_engine import LearningEngine  
 import pandas as pd 
 from datetime import datetime
 import numpy as np 
+from quest_analyzer import quest_analyzer
+from student_factor_manage import StudentFactorManager
+import storage 
+import config
+import uuid
+
+def generate_quest_id()->str:
+    """uuid 4 기반 Ques Id 생성"""
+    short_uuid=str(uuid.uuid4())[:8]
+    return f"Quest_{short_uuid}"
 
 def process_quest_creation(quest_data:dict)->str:
     quest_id = generate_quest_id()
     print(f"[Experiment] 퀘스트 생성 처리: {quest_id}")
-    questAnalyzer = QuestAnalyzer(model="gpt-4o-mini")
-    analysis = questAnalyzer.analyze(quest_data['quest_text'])
+    analysis = quest_analyzer(quest_data['quest_text'])
     print(f"[Experiment] 퀘스트 분석 결과: {analysis}")
-    studentFactorManager = StudentFactorManager(student_id="DUMMY_STUDENT", db_path=STUDENT_FACTOR_DB_PATH)
+    studentFactorManager = StudentFactorManager(student_id="DUMMY_STUDENT", db_path=config.STUDENT_FACTOR_DB_PATH)
     base_reward = studentFactorManager.calculate_base_reward(
         cognitive_score=analysis['cognitive_score'],
         effort_score=analysis['effort_score']
     )
     personalized_reward_list=[]
     for student_id in quest_data['target_students']:
-        studentFactorManager = StudentFactorManager(student_id, db_path=STUDENT_FACTOR_DB_PATH)
+        studentFactorManager = StudentFactorManager(student_id, db_path=config.STUDENT_FACTOR_DB_PATH)
         personalized_reward = studentFactorManager.calculate_personalized_reward(
             cognitive_score=analysis['cognitive_score'],    
             effort_score=analysis['effort_score'],
@@ -35,16 +41,16 @@ def process_quest_creation(quest_data:dict)->str:
         "base_reward": base_reward,
         "personalized_rewards": personalized_reward_list
     }
-    all_quests = storage.load(QUEST_DB_PATH)
+    all_quests = storage.load(config.QUEST_DB_PATH)
     all_quests[quest_id] = result
-    storage.save(QUEST_DB_PATH, all_quests)
+    storage.save(config.QUEST_DB_PATH, all_quests)
     print(f"[Experiment] 퀘스트 {quest_id}가 DB에 저장되었습니다.")
     return result
 
         
 def process_teacher_modification(quest_id: str, student_id: str,
                                 teacher_exploration: int, teacher_coral: int) -> dict:
-    all_quests = storage.load(QUEST_DB_PATH)
+    all_quests = storage.load(config.QUEST_DB_PATH)
     quest_data = all_quests.get(quest_id)
     if not quest_data:
         raise ValueError(f"퀘스트 ID {quest_id}를 찾을 수 없습니다.")
@@ -72,7 +78,7 @@ def run_factor_convergence_experiment(student_id: str, quest_sequence: list,
     if len(quest_sequence) != len(teacher_modifications):
         raise ValueError("퀘스트 시퀀스와 교사 수정 리스트의 길이는 같아야 합니다.")
 
-    manager = StudentFactorManager(student_id, db_path=STUDENT_FACTOR_DB_PATH)
+    manager = StudentFactorManager(student_id, db_path=config.STUDENT_FACTOR_DB_PATH)
     current_global_factor = manager.global_factor
     print(f"\n[Experiment] === Factor 수렴 테스트 시작 (Student: {student_id}) ===")
     print(f"[Experiment] 초기 Global Factor: {current_global_factor:.4f}\n")
