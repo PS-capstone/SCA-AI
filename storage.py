@@ -1,6 +1,6 @@
 import chromadb
 from typing import List, Dict, Any
-from build_db import getChromaClient, addData
+from build_db import get_chroma_client, add_data
 import json
 
 # ----------------------------------------------------------------------
@@ -12,11 +12,11 @@ DB_PATH = "./chroma_store_test"
 COLLECTION_NAME = "learning_logs_collection"
 
 # ----------------------------------------------------------------------
-# 2. 운영 및 조회 함수(appendLog, loadAllLogs, searchLogsByMetadata, getLogById, deleteLogsById, deleteSpecificLogForStudent)
+# 2. 운영 및 조회 함수(append_log, load_all_logs, search_logs_by_metadata, get_log_by_id, delete_logs_by_id, delete_specific_log_for_student)
 # ----------------------------------------------------------------------
 
 # 학습 로그 추가
-def appendLog(client: chromadb.Client, new_log_data: dict):
+def append_log(client: chromadb.Client, new_log_data: dict):
     print(f"⏳ 신규 로그 '{new_log_data['learning_log_id']}' 추가...")
     
     try:
@@ -25,11 +25,11 @@ def appendLog(client: chromadb.Client, new_log_data: dict):
         print(f"Error: Collection '{COLLECTION_NAME}'을 찾을 수 없습니다. DB 초기화가 필요합니다.")
         return
 
-    log_id = addData(collection, new_log_data)
+    log_id = add_data(collection, new_log_data)
     print(f"✅ 신규 로그 '{log_id}' 추가 완료. 현재 문서 수: {collection.count()}")
 
 # 로그 로드
-def loadAllLogs(client: chromadb.Client) -> List[Dict[str, Any]]:
+def load_all_logs(client: chromadb.Client) -> List[Dict[str, Any]]:
     try:
         collection = client.get_collection(name=COLLECTION_NAME)
     except Exception:
@@ -48,7 +48,7 @@ def loadAllLogs(client: chromadb.Client) -> List[Dict[str, Any]]:
     return logs
 
 # 메타데이터로 로그 로드
-def searchLogsByMetadata(client: chromadb.Client, filter_dict: Dict[str, Any], n_results: int = 10) -> List[Dict[str, Any]]:
+def search_logs_by_metadata(client: chromadb.Client, filter_dict: Dict[str, Any], n_results: int = 10) -> List[Dict[str, Any]]:
 
     # filter_dict (Dict): 메타데이터 필터 조건 (예: {"student_id": "A", "class_id": "T-001-C-001"})
 
@@ -74,7 +74,7 @@ def searchLogsByMetadata(client: chromadb.Client, filter_dict: Dict[str, Any], n
     return logs
 
 # learning_log_id로 로그 내용 조회
-def getLogById(client: chromadb.Client, log_id: str):
+def get_log_by_id(client: chromadb.Client, log_id: str):
     try:
         collection = client.get_collection(name=COLLECTION_NAME)
     except Exception:
@@ -104,7 +104,7 @@ def getLogById(client: chromadb.Client, log_id: str):
     return {"metadata": metadata, "document": doc_content}
 
 # learning_log_id로 로그 삭제
-def deleteLogsById(client: chromadb.Client, log_ids: List[str]):
+def delete_logs_by_id(client: chromadb.Client, log_ids: List[str]):
     if not log_ids:
         print("⚠️ 삭제할 로그 ID 목록이 비어 있습니다. 작업을 건너릅니다.")
         return
@@ -121,12 +121,12 @@ def deleteLogsById(client: chromadb.Client, log_ids: List[str]):
     print(f"✅ 로그 {len(log_ids)}개를 성공적으로 삭제했습니다.")
 
 # 학생id로 검색 후 특정 로그 삭제
-def deleteSpecificLogForStudent(client, student_id, target_log_id):
+def delete_specific_log_for_student(client, student_id, target_log_id):
     # 1. 해당 학생이 소유한 로그인지 확인
-    student_logs = searchLogsByMetadata(client, {"student_id": student_id}, n_results=100)
+    student_logs = search_logs_by_metadata(client, {"student_id": student_id}, n_results=100)
     
     if target_log_id in [log['metadata']['learning_log_id'] for log in student_logs]:
         # 2. ID 기반 삭제 함수 호출
-        deleteLogsById(client, [target_log_id])
+        delete_logs_by_id(client, [target_log_id])
     else:
         print(f"❌ 로그 ID '{target_log_id}'는 학생 '{student_id}'의 로그가 아니거나 존재하지 않습니다.")

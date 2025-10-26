@@ -52,7 +52,7 @@ class StudentFactorManager:
         }
         self.storage.save_json(self.student_id, data_to_save)
 
-    def getFactor(self, quest_type=None):
+    def get_factor(self, quest_type=None):
         if quest_type is None:
             return self.global_factor
         
@@ -63,15 +63,15 @@ class StudentFactorManager:
         return QUEST_TYPE_WEIGHT * quest_factor + GLOBAL_WEIGHT * self.global_factor
 
 
-    def calculateBaseReward(self, cognitive_score: int, effort_score: int) -> Dict[str, int]:
+    def calculate_base_reward(self, cognitive_score: int, effort_score: int) -> Dict[str, int]:
         exploration_data = (cognitive_score ** 2) * EXPLORATION_COGNITIVE_WEIGHT + effort_score * EXPLORATION_EFFORT_WEIGHT
         coral=effort_score * CORAL_EFFORT_WEIGHT + cognitive_score * CORAL_COGNITIVE_WEIGHT
 
         return {"exploration_data": exploration_data, "coral": coral}
 
-    def calculatePersonalizedReward(self, cognitive_score: int, effort_score: int, quest_type: str) -> Dict[str, Any]:
-        base_reward = self.calculateBaseReward(cognitive_score, effort_score)
-        factor = self.getFactor(quest_type)
+    def calculate_personalized_reward(self, cognitive_score: int, effort_score: int, quest_type: str) -> Dict[str, Any]:
+        base_reward = self.calculate_base_reward(cognitive_score, effort_score)
+        factor = self.get_factor(quest_type)
 
         personalized_exploration = round(base_reward["exploration_data"] * factor)
         personalized_coral = round(base_reward["coral"] * factor)
@@ -82,14 +82,14 @@ class StudentFactorManager:
             "factor": factor
         }
 
-    def initializeFactor(self, student_score: int)-> None:
+    def initialize_factor(self, student_score: int)-> None:
         initial_factor = 1.0 + (BASELINE_SCORE - student_score) / 100
         limited_factor = np.clip(initial_factor, INITIAL_FACTOR_MIN, INITIAL_FACTOR_MAX)
         self.global_factor = float(limited_factor)
         print(f"🚀 Global Factor initialized to {self.global_factor:.3f} (Score: {student_score})")
         self._save_state()
 
-    def updateFactor(self, quest_type: str, new_global: float, new_quest: float) -> None:
+    def update_factor(self, quest_type: str, new_global: float, new_quest: float) -> None:
         self.global_factor = new_global
         self.quest_factors[quest_type] = new_quest
         

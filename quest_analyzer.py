@@ -10,30 +10,12 @@ client = OpenAI(
   api_key=OPENAI_API_KEY, 
 )
 
-# math_books_db.json 불러오기
-try:
-    with open('math_books_db.json', 'r', encoding='utf-8') as f:
-        MATH_BOOK_DB = json.load(f)
-
-    SORTED_BOOK_KEYS = sorted(MATH_BOOK_DB.keys(), key=len, reverse=True)
-    
-    print(f"성공: math_books_db.json 로드 완료. (총 {len(SORTED_BOOK_KEYS)}권)")
-
-except FileNotFoundError:
-    print("오류: math_books_db.json 파일을 찾을 수 없습니다.")
-    MATH_BOOK_DB = {}
-    SORTED_BOOK_KEYS = []
-except json.JSONDecodeError:
-    print("오류: math_books_db.json 파일 형식이 잘못되었습니다.")
-    MATH_BOOK_DB = {}
-    SORTED_BOOK_KEYS = []
-
 # ----------------------------------------------------------------------
 # 2. llm 호출 및 Quest Analyze
 # ----------------------------------------------------------------------
 
 PROMPT_TEMPLATE = """
-    당신은 11-17세(중1~고3) 학생을 위한 수학 교육 과제 분석 AI 전문가입니다.
+    당신은 한국 중/고등학생을 위한 수학 교육 과제 분석 AI 전문가입니다.
     주어진 <Quest Content>를 아래의 <Scoring Criteria>에 따라 정밀하게 분석하세요.
     모든 분석 결과는 반드시 <Output Format>에 맞는 JSON 형식으로만 응답해야 합니다.
 
@@ -61,17 +43,16 @@ PROMPT_TEMPLATE = """
     - 9점: ~2시간
     - 10점: 2시간 초과 (매우 어렵거나 분량이 많은 프로젝트형 과제)
 
-    ### 3. 퀘스트 유형 분류 (quest_type)
-    퀘스트의 출처나 성격을 분류합니다.
-    <Context: Book Information> 섹션에 정보가 제공된 경우, 해당 정보를 **최우선으로** 사용하십시오.
-    정보가 제공되지 않았거나 교재명이 없는 경우(예: '프린트물', '개념노트 정리'), 퀘스트의 내용(문제 형식, 난이도)을 기반으로 가장 적절한 유형을 추론하여 'textbook', 'problem-solving book', 'advanced book' 중 하나로 분류하고, 어디에도 속하지 않으면 'other'로 분류합니다.
-    - textbook: 개념 학습 및 기본 예제 중심
-    - problem-solving book: 다양한 유형의 문제 풀이 훈련 중심
-    - advanced book: 높은 난이도의 심화 문제 및 경시 유형 중심
-    - other: 위 세 가지로 분류하기 어려운 경우
+    ### 3. 퀘스트 난이도
+    아래의 <difficulty_score>는 학생의 담당 선생님이 다음 기준에 따라 결정한 과제의 난이도입니다.
+    - 1점 (쉬움/개념 확인): 수업이나 교재에서 배운 핵심 개념이나 공식을 그대로 기억해서 풀 수 있는 문제(예: 일반적인 문제집의 '개념 체크', '보기' 문제)
+    - 2점 (기본/유형 적용): 배운 개념을 직접적으로 적용하는 가장 대표적인 유형의 문제(예: 쎈 B스텝 - 하)
+    - 3점 (보통/복합 응용): 두 가지 이상의 개념이 함께 사용되거나, 문제의 조건을 한 번 더 생각해야 하는 응용 문제(예: 쎈 B스텝 - 중/상)
+    - 4점 (어려움/심화 분석): 문제의 구조를 분석하고 숨겨진 조건을 찾아야 하는 본격적인 심화 문제(예: 쎈 C스텝)
+    - 5점 (매우 어려움/창의적 해결): 기존 풀이법을 넘어서는 창의적인 아이디어가 필요하거나, 여러 단계를 거쳐 논리적으로 증명/추론해야 하는 최고난도 문제(예: 모의고사 킬러문항)
 
-    ## <Context: Book Information>
-    {BOOK_INFO}
+    ## <difficulty_score>
+    {DIFFICULTY_SCORE}
     
     ## <Quest Content>
     {QUEST_CONTENT}
@@ -81,32 +62,19 @@ PROMPT_TEMPLATE = """
     {{
     "cognitive_process_score": <1에서 6까지의 정수>,
     "effort_score": <1에서 10까지의 정수>,
-    "quest_type": "<textbook | problem-solving book | advanced book | other 중 하나>",
     "analysis_reason": "cognitive_process_score, effort_score, quest_type 각각에 대한 구체적인 판단 근거를 1~2문장으로 요약하여 작성."
     }}
 """
 
 # quest_text -> 보상 추출
-def questAnalyzer(quest_text: str) -> dict:
+def quest_analyzer(quest_text: str) -> dict:
 
-    book_info_str = "제공된 교재 정보 없음. 퀘스트 내용을 바탕으로 추론하세요."
-    found_book_type = None
-
-    for book_name in SORTED_BOOK_KEYS:
-        if book_name in quest_text:
-            found_book_data = MATH_BOOK_DB[book_name]
-            found_book_type = found_book_data.get("type", "unknown") # DB에 'type'이 없을 경우 대비
-            found_book_target = found_book_data.get("target", "알 수 없음")
-
-            book_info_str = (
-                            f"퀘스트 출처 교재는 '{book_name}'(으)로 확인됩니다. "
-                            f"이 교재는 '{found_book_target}' 학생을 대상으로 하는 "
-                            f"'{found_book_type}' 유형으로 사전 분류되었습니다."
-                        )
-            break
+    ### 선생님 난이도 input 들어오면 여기에 할당
+    ### 선생님이 볼 수 있는 난이도 설명은 프론트에서
+    difficulty_score = None
 
     prompt = PROMPT_TEMPLATE.format(
-        BOOK_INFO=book_info_str,
+        DIFFICULTY_SCORE=difficulty_score,
         QUEST_CONTENT=quest_text
     )
 
