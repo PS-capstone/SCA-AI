@@ -36,6 +36,8 @@ COLD_START_WEEKS = 3  # 학기 초 보수적 학습 기간
 # 퀘스트 타입별 가중치
 QUEST_TYPE_WEIGHT = 0.6
 GLOBAL_WEIGHT = 0.4
+### 임시 추가 난이도별 가중치
+DIFFICULTY_WEIGHT = 0.6
 
 # 두 보상(탐사 데이터, 코랄) 학습 시 가중평균 비율
 EXPLORATION_REWARD_WEIGHT = 0.7  # 탐사 데이터 가중치
@@ -53,3 +55,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 OPENAI_MODEL='gpt-4o-mini'
 GEMINI_MODEL='Gemini 2.5 Flash-Lite'
+
+# 임베딩 모델
+EMBEDDING_MODEL = "sentence-transformers/multi-qa-distilbert-cos-v1" 
+COLLECTION_NAME = "learning_logs_collection"

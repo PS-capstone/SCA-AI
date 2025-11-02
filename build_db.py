@@ -1,23 +1,15 @@
 import chromadb
 from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Any
+from config import EMBEDDING_MODEL, TEST_CHROMA_PATH, COLLECTION_NAME
 
 # ----------------------------------------------------------------------
-# 1. 설정 및 초기화
-# ----------------------------------------------------------------------
-
-EMBEDDING_MODEL = "BAAI/bge-m3" 
-# 테스트 경로 "./chroma_store_test"
-DB_PATH = "./chroma_store_test"
-COLLECTION_NAME = "learning_logs_collection"
-
-# ----------------------------------------------------------------------
-# 2. 헬퍼 함수 (get_chroma_client, get_nested_value, format_to_markdown, get_metadata)
+# 1. 헬퍼 함수 (get_chroma_client, get_nested_value, format_to_markdown, get_metadata)
 # ----------------------------------------------------------------------
 
 # ChromaDB 초기화
 def get_chroma_client():
-    return chromadb.PersistentClient(path=DB_PATH)
+    return chromadb.PersistentClient(path=TEST_CHROMA_PATH)
 
 # 중첩된 딕셔너리에서 값 가져오기
 def get_nested_value(data: dict, keys: list, default: Any = "NULL") -> Any:
@@ -184,7 +176,7 @@ def get_metadata(data: Dict[str, Any]) -> Dict[str, Any]:
     return metadata
 
 # ----------------------------------------------------------------------
-# 3. 코어 데이터 처리 함수 (add_data)
+# 2. 코어 데이터 처리 함수 (add_data)
 # ----------------------------------------------------------------------
 
 # 임베딩 모델 로드
@@ -213,7 +205,7 @@ def add_data(collection, new_data: dict):
     return log_id
 
 # ----------------------------------------------------------------------
-# 4. 메인 빌드 함수(build_vectordb)
+# 3. 메인 빌드 함수(build_vectordb)
 # ----------------------------------------------------------------------
 
 # vector DB 구축

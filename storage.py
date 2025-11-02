@@ -2,17 +2,10 @@ import chromadb
 from typing import List, Dict, Any
 from build_db import get_chroma_client, add_data
 import json
+from config import COLLECTION_NAME
 
 # ----------------------------------------------------------------------
-# 1. 설정 및 초기화
-# ----------------------------------------------------------------------
-
-# 테스트 경로 "./chroma_store_test"
-DB_PATH = "./chroma_store_test"
-COLLECTION_NAME = "learning_logs_collection"
-
-# ----------------------------------------------------------------------
-# 2. 운영 및 조회 함수(append_log, load_all_logs, search_logs_by_metadata, get_log_by_id, delete_logs_by_id, delete_specific_log_for_student)
+# 1. 운영 및 조회 함수(append_log, load_all_logs, search_logs_by_metadata, get_log_by_id, delete_logs_by_id, delete_specific_log_for_student)
 # ----------------------------------------------------------------------
 
 # 학습 로그 추가

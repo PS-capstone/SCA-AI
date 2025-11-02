@@ -1,7 +1,7 @@
 from config import *
 import numpy as np
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 class MockStorage:
     def __init__(self, db_path: str):
@@ -28,50 +28,61 @@ class MockStorage:
 # StudentFactorManager class
 # ----------------------------------------------------------------------
 class StudentFactorManager:
-    def __init__(self, student_id: str, db_path: str):
-        self.student_id = student_id
+    def __init__(self, db_path: str):
         self.storage = MockStorage(db_path) 
-        
+        print("⚙️ Factor Manager (Stateless) initialized.")
+
+    # 학생 데이터 로드
+    def _load_state(self, student_id: str) -> Tuple[float, Dict[str, float]]:
         loaded_data = self.storage.load_json(student_id)
         
         if loaded_data is None:
-            self.global_factor = 1.0
-            self.quest_factors: Dict[str, float] = {}
-            self._save_state()
+            # 데이터가 없으면 기본값 반환
+            return 1.0, {}
         else:
-            self.global_factor = loaded_data.get("global_factor", 1.0)
-            self.quest_factors = loaded_data.get("quest_factors", {})
-        
-        print(f"⚙️ Manager initialized for {student_id}. Global Factor: {self.global_factor:.3f}")
-        return
+            # 데이터가 있으면 해당 값 반환
+            global_factor = loaded_data.get("global_factor", 1.0)
+            quest_factors = loaded_data.get("quest_factors", {})
+            return global_factor, quest_factors
 
-    def _save_state(self):
+    # 학생 데이터 저장
+    def _save_state(self, student_id: str, global_factor: float, quest_factors: Dict[str, float]):
         data_to_save = {
-            "global_factor": self.global_factor,
-            "quest_factors": self.quest_factors
+            "global_factor": global_factor,
+            "quest_factors": quest_factors
         }
-        self.storage.save_json(self.student_id, data_to_save)
+        self.storage.save_json(student_id, data_to_save)
 
-    def get_factor(self, quest_type=None):
-        if quest_type is None:
-            return self.global_factor
+    # 학생 보정계수 get
+    def get_factor(self, student_id: str, difficulty: str = None) -> float:
+        # 1. 학생의 상태 로드
+        global_factor, quest_factors = self._load_state(student_id)
         
-        quest_factor = self.quest_factors.get(quest_type)
+        # 2. 기존 로직 수행 (self. 변수 대신 로컬 변수 사용)
+        if difficulty is None:
+            return global_factor
+        
+        quest_factor = quest_factors.get(difficulty)
         if quest_factor is None:
-            return self.global_factor
+            return global_factor
 
-        return QUEST_TYPE_WEIGHT * quest_factor + GLOBAL_WEIGHT * self.global_factor
+        return DIFFICULTY_WEIGHT * quest_factor + GLOBAL_WEIGHT * global_factor
 
-
-    def calculate_base_reward(self, cognitive_score: int, effort_score: int) -> Dict[str, int]:
+    # 기본 보상 계산
+    @staticmethod
+    def calculate_base_reward(cognitive_score: int, effort_score: int) -> Dict[str, int]:
         exploration_data = (cognitive_score ** 2) * EXPLORATION_COGNITIVE_WEIGHT + effort_score * EXPLORATION_EFFORT_WEIGHT
-        coral=effort_score * CORAL_EFFORT_WEIGHT + cognitive_score * CORAL_COGNITIVE_WEIGHT
+        coral = effort_score * CORAL_EFFORT_WEIGHT + cognitive_score * CORAL_COGNITIVE_WEIGHT
 
         return {"exploration_data": exploration_data, "coral": coral}
 
-    def calculate_personalized_reward(self, cognitive_score: int, effort_score: int, quest_type: str) -> Dict[str, Any]:
+    # 개인화 보상 계산
+    def calculate_personalized_reward(self, student_id: str, cognitive_score: int, effort_score: int, difficulty: str) -> Dict[str, Any]:
+        # 1. 기본 보상 계산 (Static 메서드 호출)
         base_reward = self.calculate_base_reward(cognitive_score, effort_score)
-        factor = self.get_factor(quest_type)
+        
+        # 2. 학생 ID를 전달하여 Factor 계산
+        factor = self.get_factor(student_id, difficulty)
 
         personalized_exploration = round(base_reward["exploration_data"] * factor)
         personalized_coral = round(base_reward["coral"] * factor)
@@ -82,17 +93,28 @@ class StudentFactorManager:
             "factor": factor
         }
 
-    def initialize_factor(self, student_score: int)-> None:
+    # factor 초기화
+    def initialize_factor(self, student_id: str, student_score: int) -> None:
         initial_factor = 1.0 + (BASELINE_SCORE - student_score) / 100
         limited_factor = np.clip(initial_factor, INITIAL_FACTOR_MIN, INITIAL_FACTOR_MAX)
-        self.global_factor = float(limited_factor)
-        print(f"🚀 Global Factor initialized to {self.global_factor:.3f} (Score: {student_score})")
-        self._save_state()
+        
+        new_global_factor = float(limited_factor)
+        new_quest_factors = {}
+        
+        print(f"🚀 Global Factor for {student_id} initialized to {new_global_factor:.3f} (Score: {student_score})")
+        
+        self._save_state(student_id, new_global_factor, new_quest_factors)
 
-    def update_factor(self, quest_type: str, new_global: float, new_quest: float) -> None:
-        self.global_factor = new_global
-        self.quest_factors[quest_type] = new_quest
+    # factor 업데이트
+    def update_factor(self, student_id: str, difficulty: str, new_global: float, new_quest: float) -> None:
+        # 1. 학생의 '현재' 상태 로드
+        # (다른 difficulty의 factor를 덮어쓰지 않기 위해)
+        _current_global, current_quest_factors = self._load_state(student_id)
         
-        print(f"🔄 Factor updated: Global={new_global:.3f}, {quest_type}={new_quest:.3f}")
+        # 2. 새 값으로 업데이트
+        # (주의: new_global은 이전 값을 무시하고 덮어씀)
+        current_quest_factors[difficulty] = new_quest 
         
-        self._save_state()
+        print(f"🔄 Factor updated for {student_id}: Global={new_global:.3f}, {difficulty}={new_quest:.3f}")
+        
+        self._save_state(student_id, new_global, current_quest_factors)

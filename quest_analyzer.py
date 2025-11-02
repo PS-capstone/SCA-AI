@@ -44,15 +44,15 @@ PROMPT_TEMPLATE = """
     - 10점: 2시간 초과 (매우 어렵거나 분량이 많은 프로젝트형 과제)
 
     ### 3. 퀘스트 난이도
-    아래의 <difficulty_score>는 학생의 담당 선생님이 다음 기준에 따라 결정한 과제의 난이도입니다.
-    - 1점 (쉬움/개념 확인): 수업이나 교재에서 배운 핵심 개념이나 공식을 그대로 기억해서 풀 수 있는 문제(예: 일반적인 문제집의 '개념 체크', '보기' 문제)
-    - 2점 (기본/유형 적용): 배운 개념을 직접적으로 적용하는 가장 대표적인 유형의 문제(예: 쎈 B스텝 - 하)
-    - 3점 (보통/복합 응용): 두 가지 이상의 개념이 함께 사용되거나, 문제의 조건을 한 번 더 생각해야 하는 응용 문제(예: 쎈 B스텝 - 중/상)
-    - 4점 (어려움/심화 분석): 문제의 구조를 분석하고 숨겨진 조건을 찾아야 하는 본격적인 심화 문제(예: 쎈 C스텝)
-    - 5점 (매우 어려움/창의적 해결): 기존 풀이법을 넘어서는 창의적인 아이디어가 필요하거나, 여러 단계를 거쳐 논리적으로 증명/추론해야 하는 최고난도 문제(예: 모의고사 킬러문항)
+    아래의 <difficulty>는 학생의 담당 선생님이 다음 기준에 따라 결정한 과제의 난이도입니다.
+    - 1점 (EASY/개념 확인): 수업이나 교재에서 배운 핵심 개념이나 공식을 그대로 기억해서 풀 수 있는 문제(예: 일반적인 문제집의 '개념 체크', '보기' 문제)
+    - 2점 (BASIC/유형 적용): 배운 개념을 직접적으로 적용하는 가장 대표적인 유형의 문제(예: 쎈 B스텝 - 하)
+    - 3점 (MEDIUM/복합 응용): 두 가지 이상의 개념이 함께 사용되거나, 문제의 조건을 한 번 더 생각해야 하는 응용 문제(예: 쎈 B스텝 - 중/상)
+    - 4점 (HARD/심화 분석): 문제의 구조를 분석하고 숨겨진 조건을 찾아야 하는 본격적인 심화 문제(예: 쎈 C스텝)
+    - 5점 (VERY_HARD/창의적 해결): 기존 풀이법을 넘어서는 창의적인 아이디어가 필요하거나, 여러 단계를 거쳐 논리적으로 증명/추론해야 하는 최고난도 문제(예: 모의고사 킬러문항)
 
-    ## <difficulty_score>
-    {DIFFICULTY_SCORE}
+    ## <difficulty>
+    {DIFFICULTY}
     
     ## <Quest Content>
     {QUEST_CONTENT}
@@ -62,7 +62,8 @@ PROMPT_TEMPLATE = """
     {{
     "cognitive_process_score": <1에서 6까지의 정수>,
     "effort_score": <1에서 10까지의 정수>,
-    "analysis_reason": "cognitive_process_score, effort_score, quest_type 각각에 대한 구체적인 판단 근거를 1~2문장으로 요약하여 작성."
+    "difficulty": <EASY/BASIC/MEDIUM/HARD/VERY_HARD>,
+    "analysis_reason": "cognitive_process_score, effort_score, difficulty 각각에 대한 구체적인 판단 근거를 1~2문장으로 요약하여 작성."
     }}
 """
 
@@ -71,10 +72,10 @@ def quest_analyzer(quest_text: str) -> dict:
 
     ### 선생님 난이도 input 들어오면 여기에 할당
     ### 선생님이 볼 수 있는 난이도 설명은 프론트에서
-    difficulty_score = None
+    difficulty = None
 
     prompt = PROMPT_TEMPLATE.format(
-        DIFFICULTY_SCORE=difficulty_score,
+        DIFFICULTY=difficulty,
         QUEST_CONTENT=quest_text
     )
 
