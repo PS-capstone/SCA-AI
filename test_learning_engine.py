@@ -65,9 +65,9 @@ def create_test_students():
         "student_C": {"name": "박민수", "score": 85}
     }
 
+    manager = StudentFactorManager(db_path=TEST_STUDENT_FACTOR_PATH)
     for student_id, info in students.items():
-        manager = StudentFactorManager(student_id, db_path=TEST_STUDENT_FACTOR_PATH)
-        manager.initialize_factor(info["score"])
+        manager.initialize_factor(student_id=student_id, student_score=info["score"])
         print(f"  ✅ {student_id} ({info['name']}) 초기화 완료 - 성적: {info['score']}점")
 
     return students
@@ -211,10 +211,11 @@ def create_feedback_events():
 
 def print_student_factors(student_id: str):
     """학생의 현재 계수 출력"""
-    manager = StudentFactorManager(student_id, db_path=TEST_STUDENT_FACTOR_PATH)
+    manager = StudentFactorManager(db_path=TEST_STUDENT_FACTOR_PATH)
+    global_factor, quest_factors = manager._load_state(student_id)
     print(f"\n📊 [{student_id}] 현재 계수:")
-    print(f"  - Global Factor: {manager.global_factor:.4f}")
-    print(f"  - Quest Factors: {manager.quest_factors}")
+    print(f"  - Global Factor: {global_factor:.4f}")
+    print(f"  - Quest Factors: {quest_factors}")
 
 def run_simulation():
     """전체 시뮬레이션 실행"""

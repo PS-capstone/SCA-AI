@@ -16,6 +16,28 @@ class LearningEngine:
         self.student_factor_db_path = student_factor_db_path
         self.chroma_client = get_chroma_client()
         print(f"[LearningEngine] 초기화 완료. DB 경로: {self.student_factor_db_path}")
+
+    def cleanup(self):
+        """ChromaDB 클라이언트 정리"""
+        try:
+            if hasattr(self, 'chroma_client') and self.chroma_client:
+                # ChromaDB 클라이언트를 명시적으로 정리
+                # reset() 메서드로 모든 컬렉션 정리 (파일 핸들 해제)
+                try:
+                    self.chroma_client.clear_system_cache()
+                except:
+                    pass  # clear_system_cache가 없는 버전도 있음
+
+                del self.chroma_client
+                self.chroma_client = None
+
+                # 가비지 컬렉션 강제 실행
+                import gc
+                gc.collect()
+
+                print("[LearningEngine] ChromaDB 연결 정리 완료")
+        except Exception as e:
+            print(f"[LearningEngine] 정리 중 오류 (무시됨): {e}")
     
     def classify_modification(self, modification_rate:float)->str:
         """classify modification"""
@@ -27,20 +49,22 @@ class LearningEngine:
             return "MINOR" 
 
 
-    def calculate_new_factors(self, manager: StudentFactorManager, quest_type:str,
+    def calculate_new_factors(self, student_id: str, manager: StudentFactorManager, quest_type:str,
                               ai_reward: dict, teacher_reward: dict)->dict:
         """
         두 보상(exploration_data, coral)의 가중평균으로 actual_ratio를 계산하여 새 계수를 업데이트.
 
         Args:
+            student_id: 학생 ID
             manager: StudentFactorManager 인스턴스
             quest_type: 퀘스트 타입 (예: 'blacklabel', 'rpm')
             ai_reward: {"exploration_data": int, "coral": int}
             teacher_reward: {"exploration_data": int, "coral": int}
         """
 
-        old_global = manager.global_factor
-        old_quest = manager.quest_factors.get(quest_type, manager.global_factor)
+        old_global_factor, old_quest_factors = manager._load_state(student_id)
+        old_global = old_global_factor
+        old_quest = old_quest_factors.get(quest_type, old_global_factor)
 
         if ai_reward["exploration_data"]==0.0:
             ai_reward["exploration_data"]=1.0
@@ -104,14 +128,16 @@ class LearningEngine:
             teacher_reward = feedback_event["teacher_reward"]
             analysis=feedback_event["analysis"]
             
-            manager = StudentFactorManager(student_id, db_path=self.student_factor_db_path)
+            manager = StudentFactorManager(db_path=self.student_factor_db_path)
 
             # 계수 업데이트 전 기존 값 저장
-            old_global = manager.global_factor
-            old_quest = manager.quest_factors.get(quest_type, manager.global_factor)
+            old_global_factor, old_quest_factors = manager._load_state(student_id)
+            old_global = old_global_factor
+            old_quest = old_quest_factors.get(quest_type, old_global_factor)
 
             # 새로운 계수 계산 (두 보상을 dict로 전달)
             update_results = self.calculate_new_factors(
+                student_id=student_id,
                 manager=manager,
                 quest_type=quest_type,
                 ai_reward=ai_reward,
@@ -120,7 +146,8 @@ class LearningEngine:
 
             # 계수 업데이트
             manager.update_factor(
-                quest_type=quest_type,
+                student_id=student_id,
+                difficulty=quest_type,
                 new_global=update_results["new_global"],
                 new_quest=update_results["new_quest"]
             )

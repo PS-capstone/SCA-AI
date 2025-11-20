@@ -11,11 +11,12 @@ from config import COLLECTION_NAME
 # 학습 로그 추가
 def append_log(client: chromadb.Client, new_log_data: dict):
     print(f"⏳ 신규 로그 '{new_log_data['learning_log_id']}' 추가...")
-    
+
     try:
-        collection = client.get_collection(name=COLLECTION_NAME)
-    except Exception:
-        print(f"Error: Collection '{COLLECTION_NAME}'을 찾을 수 없습니다. DB 초기화가 필요합니다.")
+        collection = client.get_or_create_collection(name=COLLECTION_NAME)
+        print(f"✅ Collection '{COLLECTION_NAME}' 준비 완료.")
+    except Exception as e:
+        print(f"Error: Collection '{COLLECTION_NAME}' 생성/로드 실패: {e}")
         return
 
     log_id = add_data(collection, new_log_data)
@@ -24,9 +25,9 @@ def append_log(client: chromadb.Client, new_log_data: dict):
 # 로그 로드
 def load_all_logs(client: chromadb.Client) -> List[Dict[str, Any]]:
     try:
-        collection = client.get_collection(name=COLLECTION_NAME)
-    except Exception:
-        print("Error: Collection을 찾을 수 없습니다.")
+        collection = client.get_or_create_collection(name=COLLECTION_NAME)
+    except Exception as e:
+        print(f"Error: Collection 생성/로드 실패: {e}")
         return []
         
     results = collection.get(
@@ -46,9 +47,9 @@ def search_logs_by_metadata(client: chromadb.Client, filter_dict: Dict[str, Any]
     # filter_dict (Dict): 메타데이터 필터 조건 (예: {"student_id": "A", "class_id": "T-001-C-001"})
 
     try:
-        collection = client.get_collection(name=COLLECTION_NAME)
-    except Exception:
-        print(f"Error: Collection '{COLLECTION_NAME}'을 찾을 수 없습니다.")
+        collection = client.get_or_create_collection(name=COLLECTION_NAME)
+    except Exception as e:
+        print(f"Error: Collection '{COLLECTION_NAME}' 생성/로드 실패: {e}")
         return []
 
     print(f"🔎 메타데이터 검색 시작: 필터={filter_dict}")
@@ -69,9 +70,9 @@ def search_logs_by_metadata(client: chromadb.Client, filter_dict: Dict[str, Any]
 # learning_log_id로 로그 내용 조회
 def get_log_by_id(client: chromadb.Client, log_id: str):
     try:
-        collection = client.get_collection(name=COLLECTION_NAME)
-    except Exception:
-        print(f"Error: Collection '{COLLECTION_NAME}'을 찾을 수 없습니다.")
+        collection = client.get_or_create_collection(name=COLLECTION_NAME)
+    except Exception as e:
+        print(f"Error: Collection '{COLLECTION_NAME}' 생성/로드 실패: {e}")
         return None
 
     results = collection.get(
@@ -101,11 +102,11 @@ def delete_logs_by_id(client: chromadb.Client, log_ids: List[str]):
     if not log_ids:
         print("⚠️ 삭제할 로그 ID 목록이 비어 있습니다. 작업을 건너릅니다.")
         return
-        
+
     try:
-        collection = client.get_collection(name=COLLECTION_NAME)
-    except Exception:
-        print(f"Error: Collection '{COLLECTION_NAME}'을 찾을 수 없습니다.")
+        collection = client.get_or_create_collection(name=COLLECTION_NAME)
+    except Exception as e:
+        print(f"Error: Collection '{COLLECTION_NAME}' 생성/로드 실패: {e}")
         return
 
     # Document ID 목록을 사용하여 삭제를 요청합니다.

@@ -28,51 +28,48 @@ def generate_quest_id()->str:
     short_uuid=str(uuid.uuid4())[:8]
     return f"Quest_{short_uuid}"
 
-def infer_quest_type(quest_text: str) -> str:
-    """퀘스트 텍스트에서 quest_type을 추론"""
-    quest_text_lower = quest_text.lower()
-
-    if "블랙라벨" in quest_text or "blacklabel" in quest_text_lower or "black label" in quest_text_lower:
-        return "blacklabel"
-    elif "교과서" in quest_text or "textbook" in quest_text_lower:
-        return "textbook"
-    elif "rpm" in quest_text_lower:
-        return "rpm"
-    elif "쎈" in quest_text or "sen" in quest_text_lower:
-        return "sen"
-    elif "개념" in quest_text or "concept" in quest_text_lower:
-        return "concept"
-    elif "시험" in quest_text or "test" in quest_text_lower or "모의고사" in quest_text:
-        return "test"
-    else:
-        return "general"
-
 def process_quest_creation(quest_data:dict)->str:
+    """
+    퀘스트 생성 처리
+
+    Args:
+        quest_data: {
+            'quest_text': str,  # 퀘스트 텍스트
+            'difficulty': str,  # 난이도 (EASY, BASIC, MEDIUM, HARD, VERY_HARD)
+            'target_students': list  # 학생 ID 리스트
+        }
+    """
     quest_id = generate_quest_id()
     print(f"[Experiment] 퀘스트 생성 처리: {quest_id}")
-    analysis = quest_analyzer(quest_data['quest_text'])
+
+    # 난이도가 제공되지 않으면 에러
+    if 'difficulty' not in quest_data:
+        raise ValueError("quest_data에 'difficulty' 필드가 필요합니다. (EASY, BASIC, MEDIUM, HARD, VERY_HARD)")
+
+    difficulty = quest_data['difficulty']
+    print(f"[Experiment] 선생님 입력 난이도: {difficulty}")
+
+    # 난이도를 포함하여 퀘스트 분석
+    analysis = quest_analyzer(quest_data['quest_text'], difficulty=difficulty)
     print(f"[Experiment] 퀘스트 분석 결과: {analysis}")
 
-    # quest_type이 없으면 텍스트에서 추론
-    if 'quest_type' not in analysis:
-        analysis['quest_type'] = infer_quest_type(quest_data['quest_text'])
-        print(f"[Experiment] Quest Type 추론: {analysis['quest_type']}")
+    # 선생님이 입력한 난이도를 quest_type으로 사용
+    analysis['quest_type'] = difficulty
 
-    # Calculate base_reward using first student's manager (base reward is same for all)
-    first_student_id = quest_data['target_students'][0]
-    temp_manager = StudentFactorManager(student_id=first_student_id, db_path=config.TEST_STUDENT_FACTOR_PATH)
-    base_reward = temp_manager.calculate_base_reward(
+    # Calculate base_reward (static method, no student_id needed)
+    base_reward = StudentFactorManager.calculate_base_reward(
         cognitive_score=analysis['cognitive_process_score'],
         effort_score=analysis['effort_score']
     )
 
     personalized_reward_list=[]
+    manager = StudentFactorManager(db_path=config.TEST_STUDENT_FACTOR_PATH)
     for student_id in quest_data['target_students']:
-        studentFactorManager = StudentFactorManager(student_id=student_id, db_path=config.TEST_STUDENT_FACTOR_PATH)
-        personalized_reward = studentFactorManager.calculate_personalized_reward(
+        personalized_reward = manager.calculate_personalized_reward(
+            student_id=student_id,
             cognitive_score=analysis['cognitive_process_score'],
             effort_score=analysis['effort_score'],
-            quest_type=analysis['quest_type']
+            difficulty=analysis['quest_type']
         )
         personalized_reward_list.append({
             "student_id": student_id,
@@ -133,29 +130,46 @@ def process_teacher_modification(quest_id: str, student_id: str,
 
     learningEngine = LearningEngine(student_factor_db_path=config.TEST_STUDENT_FACTOR_PATH)
     learning_result = learningEngine.run_learning_cycle(feedback_event)
+    learningEngine.cleanup()  # ChromaDB 연결 정리
+
+    # Windows에서 파일 핸들이 완전히 해제될 때까지 대기
+    import time
+    import gc
+    gc.collect()
+    time.sleep(0.1)
+
     print(f"[Experiment] 수정 처리 완료 (학습 적용)")
     return learning_result
 
 def run_factor_convergence_experiment(student_id: str, quest_sequence: list,
                                      teacher_modifications: list) -> pd.DataFrame:
+    """
+    Factor 수렴 실험
+
+    Args:
+        student_id: 학생 ID
+        quest_sequence: [(quest_text, difficulty), ...] 형식의 리스트
+        teacher_modifications: [(exploration, coral), ...] 형식의 리스트
+    """
     if len(quest_sequence) != len(teacher_modifications):
         raise ValueError("퀘스트 시퀀스와 교사 수정 리스트의 길이는 같아야 합니다.")
 
-    manager = StudentFactorManager(student_id=student_id, db_path=config.TEST_STUDENT_FACTOR_PATH)
-    current_global_factor = manager.global_factor
+    manager = StudentFactorManager(db_path=config.TEST_STUDENT_FACTOR_PATH)
+    current_global_factor, _ = manager._load_state(student_id)
     print(f"\n[Experiment] === Factor 수렴 테스트 시작 (Student: {student_id}) ===")
     print(f"[Experiment] 초기 Global Factor: {current_global_factor:.4f}\n")
 
     results_list = []
     for i in range(len(quest_sequence)):
-        quest_text = quest_sequence[i]
+        quest_text, difficulty = quest_sequence[i]
         teacher_exploration, teacher_coral = teacher_modifications[i]
 
         print(f"\n--- [Iteration {i+1} / {len(quest_sequence)}] ---")
-        
+
         quest_data_input = {
             "quest_text": quest_text,
-            "target_students": [student_id], 
+            "difficulty": difficulty,
+            "target_students": [student_id],
         }
         
         creation_result = process_quest_creation(quest_data_input)
@@ -202,66 +216,82 @@ def run_factor_convergence_experiment(student_id: str, quest_sequence: list,
     return df
 
 
-def run_quest_type_experiment(student_id: str, 
-                             quest_scenarios: dict, 
+def run_quest_type_experiment(student_id: str,
+                             quest_scenarios: dict,
                              iterations_per_type: int) -> pd.DataFrame:
-    
+    """
+    난이도별 독립 학습 실험
+
+    Args:
+        student_id: 학생 ID
+        quest_scenarios: {difficulty: (quest_text, difficulty, teacher_answer), ...} 형식의 딕셔너리
+        iterations_per_type: 각 난이도당 반복 횟수
+    """
     all_results = []
-    
-    print(f"\n[Experiment] === 퀘스트 타입별 독립 학습 테스트 시작 ===")
-    
-    for quest_type, (quest_text, teacher_answer) in quest_scenarios.items():
-        print(f"\n--- [Testing Type: {quest_type}] ---")
-        
-        quest_sequence = [quest_text] * iterations_per_type
+
+    print(f"\n[Experiment] === 난이도별 독립 학습 테스트 시작 ===")
+
+    for difficulty_key, (quest_text, difficulty, teacher_answer) in quest_scenarios.items():
+        print(f"\n--- [Testing Difficulty: {difficulty}] ---")
+
+        quest_sequence = [(quest_text, difficulty)] * iterations_per_type
         teacher_modifications = [teacher_answer] * iterations_per_type
-   
+
         df = run_factor_convergence_experiment(
             student_id=student_id,
             quest_sequence=quest_sequence,
             teacher_modifications=teacher_modifications
         )
-        
-        df['test_type'] = quest_type
+
+        df['test_type'] = difficulty
         all_results.append(df)
 
-    print(f"[Experiment] === 퀘스트 타입별 독립 학습 테스트 종료 ===")
-    
+    print(f"[Experiment] === 난이도별 독립 학습 테스트 종료 ===")
+
     return pd.concat(all_results, ignore_index=True)
 
 
-def run_cold_start_experiment(initial_scores: list, 
-                             quest_count: int, 
+def run_cold_start_experiment(initial_scores: list,
+                             quest_count: int,
                              fixed_quest_text: str,
+                             fixed_difficulty: str,
                              fixed_teacher_answer: tuple) -> pd.DataFrame:
+    """
+    콜드 스타트 실험
 
-    
+    Args:
+        initial_scores: 초기 성적 리스트
+        quest_count: 각 학생당 퀘스트 개수
+        fixed_quest_text: 고정된 퀘스트 텍스트
+        fixed_difficulty: 고정된 난이도
+        fixed_teacher_answer: 고정된 교사 정답
+    """
     all_results = []
-    
+
     print(f"\n[Experiment] === 콜드 스타트 (초기 성적별) 테스트 시작 ===")
-    
-    quest_sequence = [fixed_quest_text] * quest_count
+
+    quest_sequence = [(fixed_quest_text, fixed_difficulty)] * quest_count
     teacher_modifications = [fixed_teacher_answer] * quest_count
-    
+
     for score in initial_scores:
         print(f"\n--- [Testing Score: {score}] ---")
 
         student_id = f"cold_start_student_{score}"
 
-        manager = StudentFactorManager(student_id=student_id, db_path=config.TEST_STUDENT_FACTOR_PATH)
-        manager.initialize_factor(student_score=score)
-        
+        manager = StudentFactorManager(db_path=config.TEST_STUDENT_FACTOR_PATH)
+        manager.initialize_factor(student_id=student_id, student_score=score)
+
         df = run_factor_convergence_experiment(
             student_id=student_id,
             quest_sequence=quest_sequence,
             teacher_modifications=teacher_modifications
         )
-        
+
         df['initial_score'] = score
         all_results.append(df)
-        
+
     print(f"[Experiment] === 콜드 스타트 (초기 성적별) 테스트 종료 ===")
-    
+
     return pd.concat(all_results, ignore_index=True)
 
 

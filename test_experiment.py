@@ -13,6 +13,8 @@ import json
 import shutil
 import pandas as pd
 from datetime import datetime
+import time
+import gc
 
 # 프로젝트 루트를 경로에 추가
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -36,10 +38,67 @@ def cleanup_test_data():
     ]
 
     print("\n[테스트 준비] 기존 테스트 데이터 정리 중...")
+
+    # 가비지 컬렉션을 통해 열려있는 객체 정리
+    gc.collect()
+    time.sleep(0.5)  # ChromaDB 연결이 완전히 닫힐 시간 제공
+
     for test_dir in test_dirs:
         if os.path.exists(test_dir):
-            shutil.rmtree(test_dir)
-            print(f"  - 삭제: {test_dir}")
+            # ChromaDB 디렉토리는 특별히 처리
+            if "chroma" in test_dir.lower():
+                max_retries = 5  # 재시도 횟수 증가
+                for retry in range(max_retries):
+                    try:
+                        # Windows에서는 shutil.rmtree의 onerror 핸들러 사용
+                        def handle_remove_readonly(func, path, exc):
+                            """읽기 전용 파일 삭제 시도"""
+                            import stat
+                            if not os.access(path, os.W_OK):
+                                os.chmod(path, stat.S_IWUSR)
+                                func(path)
+                            else:
+                                raise
+
+                        shutil.rmtree(test_dir, onerror=handle_remove_readonly)
+                        print(f"  - 삭제: {test_dir}")
+                        break
+                    except (PermissionError, OSError) as e:
+                        if retry < max_retries - 1:
+                            print(f"  - ChromaDB 삭제 대기 중... (시도 {retry + 1}/{max_retries})")
+                            gc.collect()
+                            time.sleep(2)  # 대기 시간 증가
+                        else:
+                            # 최종 실패 시 파일별로 삭제 시도
+                            print(f"  - 경고: {test_dir} 일괄 삭제 실패. 개별 파일 삭제 시도 중...")
+                            try:
+                                for root, dirs, files in os.walk(test_dir, topdown=False):
+                                    for name in files:
+                                        file_path = os.path.join(root, name)
+                                        try:
+                                            os.chmod(file_path, 0o777)
+                                            os.remove(file_path)
+                                        except:
+                                            pass
+                                    for name in dirs:
+                                        try:
+                                            os.rmdir(os.path.join(root, name))
+                                        except:
+                                            pass
+                                try:
+                                    os.rmdir(test_dir)
+                                    print(f"  - 개별 삭제 성공: {test_dir}")
+                                except:
+                                    print(f"  - 최종 경고: {test_dir} 일부 파일이 남아있을 수 있습니다.")
+                                    print(f"    오류: {e}")
+                            except Exception as e2:
+                                print(f"  - 최종 경고: {test_dir} 삭제 완전 실패: {e2}")
+            else:
+                try:
+                    shutil.rmtree(test_dir)
+                    print(f"  - 삭제: {test_dir}")
+                except Exception as e:
+                    print(f"  - 경고: {test_dir} 삭제 실패: {e}")
 
     for test_dir in test_dirs:
         os.makedirs(test_dir, exist_ok=True)
@@ -87,11 +146,11 @@ def test_1_factor_convergence():
 
     # 동일한 퀘스트를 반복하여 factor가 수렴하는지 확인
     quest_sequence = [
-        "블랙라벨 중등 수학 1-1 10문제 풀기",
-        "블랙라벨 중등 수학 1-1 10문제 풀기",
-        "블랙라벨 중등 수학 1-1 10문제 풀기",
-        "블랙라벨 중등 수학 1-1 10문제 풀기",
-        "블랙라벨 중등 수학 1-1 10문제 풀기",
+        ("블랙라벨 중등 수학 1-1 10문제 풀기", "HARD"),
+        ("블랙라벨 중등 수학 1-1 10문제 풀기", "HARD"),
+        ("블랙라벨 중등 수학 1-1 10문제 풀기", "HARD"),
+        ("블랙라벨 중등 수학 1-1 10문제 풀기", "HARD"),
+        ("블랙라벨 중등 수학 1-1 10문제 풀기", "HARD"),
     ]
 
     # 교사가 항상 동일한 보상 값으로 수정 (exploration=100, coral=50)
@@ -124,26 +183,34 @@ def test_1_factor_convergence():
 
 
 def test_2_quest_type_specific():
-    """테스트 2: 퀘스트 타입별 독립 학습 테스트"""
+    """테스트 2: 난이도별 독립 학습 테스트"""
     print("\n" + "="*80)
-    print("테스트 2: 퀘스트 타입별 독립 학습 테스트")
+    print("테스트 2: 난이도별 독립 학습 테스트")
     print("="*80)
 
-    student_id = "quest_type_test_student"
+    student_id = "difficulty_test_student"
 
-    # 각 퀘스트 타입별로 다른 난이도와 교사 정답 설정
+    # 각 난이도별로 다른 퀘스트와 교사 정답 설정
     quest_scenarios = {
-        "blacklabel": (
+        "HARD": (
             "블랙라벨 중등 수학 1-1 10문제 풀기",
+            "HARD",
             (120, 60)  # exploration=120, coral=60
         ),
-        "textbook": (
+        "BASIC": (
             "교과서 기본 개념 문제 5문제 풀기",
+            "BASIC",
             (30, 20)  # exploration=30, coral=20
         ),
-        "rpm": (
-            "RPM 사고력 문제 8문제 풀기",
+        "MEDIUM": (
+            "쎈 수학 문제 8문제 풀기",
+            "MEDIUM",
             (80, 40)  # exploration=80, coral=40
+        ),
+        "VERY_HARD": (
+            "최상위 심화 문제 5문제 풀기",
+            "VERY_HARD",
+            (150, 80)  # exploration=150, coral=80
         )
     }
 
@@ -181,26 +248,31 @@ def test_3_cold_start():
     student_scenarios = {
         50: {
             "quest_text": "블랙라벨 중등 수학 1-1 10문제 풀기",
+            "difficulty": "HARD",
             "teacher_answer": (130, 70),  # 하위권 학생에게는 높은 보상
             "description": "하위권 - 어려운 과제이므로 높은 보상"
         },
         65: {
             "quest_text": "블랙라벨 중등 수학 1-1 10문제 풀기",
+            "difficulty": "HARD",
             "teacher_answer": (115, 60),  # 중하위권
             "description": "중하위권 - 도전적인 과제"
         },
         75: {
             "quest_text": "블랙라벨 중등 수학 1-1 10문제 풀기",
+            "difficulty": "HARD",
             "teacher_answer": (100, 50),  # 중위권 - 기준
             "description": "중위권 - 적절한 수준의 과제"
         },
         85: {
             "quest_text": "블랙라벨 중등 수학 1-1 10문제 풀기",
+            "difficulty": "HARD",
             "teacher_answer": (85, 45),  # 중상위권
             "description": "중상위권 - 다소 쉬운 과제"
         },
         95: {
             "quest_text": "블랙라벨 중등 수학 1-1 10문제 풀기",
+            "difficulty": "HARD",
             "teacher_answer": (70, 40),  # 상위권 학생에게는 낮은 보상
             "description": "상위권 - 쉬운 과제이므로 낮은 보상"
         }
@@ -219,10 +291,10 @@ def test_3_cold_start():
 
         # StudentFactorManager 초기화
         from student_factor_manage import StudentFactorManager
-        manager = StudentFactorManager(student_id=student_id, db_path=config.TEST_STUDENT_FACTOR_PATH)
-        manager.initialize_factor(student_score=score)
+        manager = StudentFactorManager(db_path=config.TEST_STUDENT_FACTOR_PATH)
+        manager.initialize_factor(student_id=student_id, student_score=score)
 
-        quest_sequence = [scenario['quest_text']] * quest_count
+        quest_sequence = [(scenario['quest_text'], scenario['difficulty'])] * quest_count
         teacher_modifications = [scenario['teacher_answer']] * quest_count
 
         df = run_factor_convergence_experiment(

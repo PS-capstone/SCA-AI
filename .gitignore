@@ -129,7 +129,12 @@ Thumbs.db
 data/
 *.json
 !config.json
+!students.json
 logs/
 *.log
 
 data/
+
+chroma_store_test/
+
+*.md

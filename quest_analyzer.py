@@ -68,12 +68,17 @@ PROMPT_TEMPLATE = """
 """
 
 # quest_text -> 보상 추출
-def quest_analyzer(quest_text: str) -> dict:
+def quest_analyzer(quest_text: str, difficulty: str = "MEDIUM") -> dict:
+    """
+    퀘스트 텍스트를 분석하여 인지 과정 점수와 노력 점수를 산출
 
-    ### 선생님 난이도 input 들어오면 여기에 할당
-    ### 선생님이 볼 수 있는 난이도 설명은 프론트에서
-    difficulty = None
+    Args:
+        quest_text: 퀘스트 내용
+        difficulty: 선생님이 지정한 난이도 (EASY, BASIC, MEDIUM, HARD, VERY_HARD)
 
+    Returns:
+        분석 결과 딕셔너리
+    """
     prompt = PROMPT_TEMPLATE.format(
         DIFFICULTY=difficulty,
         QUEST_CONTENT=quest_text

@@ -1,0 +1,25 @@
+{
+  "students": [
+    {
+      "id": "student_A",
+      "name": "학생 A",
+      "score": 95,
+      "desc": "알아서 잘함, 보상 적어도 됨",
+      "group": "상위권"
+    },
+    {
+      "id": "student_B",
+      "name": "학생 B",
+      "score": 75,
+      "desc": "노력한 만큼 보상이 필요함 (기준)",
+      "group": "중위권"
+    },
+    {
+      "id": "student_C",
+      "name": "학생 C",
+      "score": 50,
+      "desc": "동기부여를 위해 보상을 많이 줘야 함",
+      "group": "하위권"
+    }
+  ]
+}
